@@ -104,22 +104,67 @@ class _PosPageState extends State<PosPage> {
                       itemCount: filtered.length,
                       itemBuilder: (_, i) {
                         final p = filtered[i];
+                        final inCart = cart.containsKey(p);
                         return Container(
                           decoration: BoxDecoration(
-                            color: Colors.white,
+                            color: inCart ? const Color(0xFFEFF6FF) : Colors.white,
                             borderRadius: BorderRadius.circular(12),
-                            border: Border.all(color: const Color(0xFFE5E7EB)),
+                            border: Border.all(
+                              color: inCart ? const Color(0xFF3B82F6) : const Color(0xFFE5E7EB),
+                              width: inCart ? 2 : 1,
+                            ),
+                            boxShadow: inCart ? [
+                              BoxShadow(
+                                color: const Color(0xFF3B82F6).withOpacity(0.1),
+                                blurRadius: 8,
+                                offset: const Offset(0, 2),
+                              )
+                            ] : null,
                           ),
                           child: ListTile(
                             contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                            title: Text(p.name, style: const TextStyle(fontWeight: FontWeight.w600)),
-                            subtitle: Text('Stok: ${p.stock}', style: const TextStyle(fontSize: 12, color: Color(0xFF64748B))),
+                            leading: Container(
+                              width: 40,
+                              height: 40,
+                              decoration: BoxDecoration(
+                                color: inCart ? const Color(0xFF3B82F6) : const Color(0xFFF3F4F6),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Icon(Icons.shopping_bag, color: inCart ? Colors.white : const Color(0xFF94A3B8), size: 20),
+                            ),
+                            title: Text(p.name, 
+                              style: TextStyle(
+                                fontWeight: FontWeight.w600,
+                                color: inCart ? const Color(0xFF3B82F6) : const Color(0xFF0F172A),
+                              )),
+                            subtitle: Row(
+                              children: [
+                                Text('Stok: ${p.stock}', 
+                                  style: const TextStyle(fontSize: 12, color: Color(0xFF64748B))),
+                                if (inCart) ...[
+                                  const SizedBox(width: 8),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFF16A34A),
+                                      borderRadius: BorderRadius.circular(4),
+                                    ),
+                                    child: Text('✓ ${cart[p]}', 
+                                      style: const TextStyle(fontSize: 11, color: Colors.white, fontWeight: FontWeight.w600)),
+                                  ),
+                                ]
+                              ],
+                            ),
                             trailing: Column(
                               mainAxisAlignment: MainAxisAlignment.center,
                               crossAxisAlignment: CrossAxisAlignment.end,
                               children: [
                                 Text('Rp ${p.sellPrice}',
-                                    style: const TextStyle(fontWeight: FontWeight.w700, color: Color(0xFF3B82F6))),
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.w700, 
+                                      color: inCart ? const Color(0xFF3B82F6) : const Color(0xFF3B82F6),
+                                      fontSize: 13,
+                                    )),
                               ],
                             ),
                             onTap: () =>
@@ -179,7 +224,12 @@ class _PosPageState extends State<PosPage> {
                                     itemBuilder: (_, i) {
                                       final e = cart.entries.elementAt(i);
                                       return Container(
-                                        padding: const EdgeInsets.symmetric(vertical: 8),
+                                        padding: const EdgeInsets.all(12),
+                                        decoration: BoxDecoration(
+                                          color: const Color(0xFFF8FAFC),
+                                          borderRadius: BorderRadius.circular(10),
+                                          border: Border.all(color: const Color(0xFFE2E8F0)),
+                                        ),
                                         child: Row(
                                           children: [
                                             Expanded(
@@ -188,17 +238,60 @@ class _PosPageState extends State<PosPage> {
                                                 children: [
                                                   Text(e.key.name,
                                                       style: const TextStyle(
-                                                          fontWeight: FontWeight.w600, fontSize: 13)),
+                                                          fontWeight: FontWeight.w600, fontSize: 13, color: Color(0xFF0F172A))),
+                                                  const SizedBox(height: 4),
                                                   Text(
-                                                      '${e.value} x Rp ${e.key.sellPrice}',
+                                                      'Rp ${e.key.sellPrice}',
                                                       style: const TextStyle(
                                                           fontSize: 12, color: Color(0xFF64748B))),
                                                 ],
                                               ),
                                             ),
+                                            Container(
+                                              decoration: BoxDecoration(
+                                                color: Colors.white,
+                                                borderRadius: BorderRadius.circular(8),
+                                                border: Border.all(color: const Color(0xFFE2E8F0)),
+                                              ),
+                                              child: Row(
+                                                children: [
+                                                  InkWell(
+                                                    onTap: () => setState(() {
+                                                      if (cart[e.key]! > 1) {
+                                                        cart[e.key] = cart[e.key]! - 1;
+                                                      } else {
+                                                        cart.remove(e.key);
+                                                      }
+                                                    }),
+                                                    child: Container(
+                                                      padding: const EdgeInsets.all(6),
+                                                      child: const Icon(Icons.remove, size: 16, color: Color(0xFFDC2626)),
+                                                    ),
+                                                  ),
+                                                  Container(
+                                                    padding: const EdgeInsets.symmetric(horizontal: 8),
+                                                    child: Text('${e.value}',
+                                                        style: const TextStyle(
+                                                            fontWeight: FontWeight.w600, fontSize: 13, color: Color(0xFF0F172A))),
+                                                  ),
+                                                  InkWell(
+                                                    onTap: () => setState(() {
+                                                      if (e.value < e.key.stock) {
+                                                        cart[e.key] = cart[e.key]! + 1;
+                                                      }
+                                                    }),
+                                                    child: Container(
+                                                      padding: const EdgeInsets.all(6),
+                                                      child: const Icon(Icons.add, size: 16, color: Color(0xFF16A34A)),
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                            ),
+                                            const SizedBox(width: 12),
                                             Text('Rp ${e.value * e.key.sellPrice}',
                                                 style: const TextStyle(
-                                                    fontWeight: FontWeight.w700, color: Color(0xFF3B82F6))),
+                                                    fontWeight: FontWeight.w700, color: Color(0xFF3B82F6), fontSize: 13)),
                                           ],
                                         ),
                                       );

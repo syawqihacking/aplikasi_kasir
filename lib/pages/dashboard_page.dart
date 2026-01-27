@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
+import 'dart:async';
 import '../core/widgets/app_layout.dart';
 import '../services/report_service.dart';
+import '../services/printer_service.dart';
 import 'inventory_page.dart';
 import 'pos_page.dart';
 import 'reports_page.dart';
@@ -22,17 +24,33 @@ class _DashboardPageState extends State<DashboardPage> {
   DateTime endDate = DateTime.now();
   Map<DateTime, int> dailyRevenue = {};
   bool isDateRangeSelected = false;
+  bool printerReady = false;
+  Timer? _printerCheckTimer;
 
   @override
   void initState() {
     super.initState();
     _load();
+    _startPrinterCheck();
+  }
+
+  void _startPrinterCheck() {
+    // Check printer status setiap 2 detik
+    _printerCheckTimer = Timer.periodic(const Duration(seconds: 2), (_) async {
+      final isReady = await PrinterService().isPrinterAvailable();
+      if (mounted && isReady != printerReady) {
+        setState(() {
+          printerReady = isReady;
+        });
+      }
+    });
   }
 
   Future<void> _load() async {
     grossToday = await ReportService.totalGrossToday();
     netToday = await ReportService.totalNetToday();
     await _loadChartData();
+    printerReady = await PrinterService().isPrinterAvailable();
     setState(() {});
   }
 
@@ -94,6 +112,12 @@ class _DashboardPageState extends State<DashboardPage> {
   }
 
   @override
+  void dispose() {
+    _printerCheckTimer?.cancel();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     return AppLayout(
       selectedIndex: 0,
@@ -106,7 +130,7 @@ class _DashboardPageState extends State<DashboardPage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              /// TITLE & RESET BUTTON
+              /// TITLE & PRINTER STATUS
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
@@ -118,20 +142,57 @@ class _DashboardPageState extends State<DashboardPage> {
                       color: Color(0xFF0F172A),
                     ),
                   ),
-                  if (isDateRangeSelected)
-                    TextButton.icon(
-                      icon: const Icon(Icons.refresh, size: 18),
-                      label: const Text('Reset'),
-                      onPressed: () {
-                        setState(() {
-                          isDateRangeSelected = false;
-                          grossPeriod = 0;
-                          netPeriod = 0;
-                        });
-                      },
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: printerReady ? const Color(0xFFDCFCE7) : const Color(0xFFFEE2E2),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(
+                        color: printerReady ? const Color(0xFF86EFAC) : const Color(0xFFFECACA),
+                      ),
                     ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.print,
+                          size: 18,
+                          color: printerReady ? const Color(0xFF16A34A) : const Color(0xFFDC2626),
+                        ),
+                        const SizedBox(width: 6),
+                        Text(
+                          printerReady ? 'Printer Siap' : 'Printer Tidak Siap',
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                            color: printerReady ? const Color(0xFF16A34A) : const Color(0xFFDC2626),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
                 ],
               ),
+              const SizedBox(height: 20),
+
+              /// RESET BUTTON (if date range selected)
+              if (isDateRangeSelected)
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: TextButton.icon(
+                    icon: const Icon(Icons.refresh, size: 18),
+                    label: const Text('Reset'),
+                    onPressed: () {
+                      setState(() {
+                        isDateRangeSelected = false;
+                        grossPeriod = 0;
+                        netPeriod = 0;
+                      });
+                    },
+                  ),
+                )
+              else
+                const SizedBox.shrink(),
               const SizedBox(height: 20),
 
               Row(
