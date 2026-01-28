@@ -4,6 +4,7 @@ import 'dart:async';
 import '../core/widgets/app_layout.dart';
 import '../services/report_service.dart';
 import '../services/printer_service.dart';
+import '../services/backup_service.dart';
 import 'inventory_page.dart';
 import 'pos_page.dart';
 import 'reports_page.dart';
@@ -55,12 +56,21 @@ class _DashboardPageState extends State<DashboardPage> {
   }
 
   Future<void> _loadChartData() async {
+    // Get actual revenue data from database
+    final dbData = await ReportService.dailyRevenueByDateRange(startDate, endDate);
+    
     dailyRevenue = {};
+    
+    // Initialize all dates with 0
     for (int i = 0; i < endDate.difference(startDate).inDays + 1; i++) {
       final date = startDate.add(Duration(days: i));
-      // Simulasi data - dalam production bisa ambil dari database
-      dailyRevenue[date] = (50000 + (i * 10000) % 100000).toInt();
+      dailyRevenue[date] = 0;
     }
+    
+    // Fill with actual data from database
+    dbData.forEach((date, revenue) {
+      dailyRevenue[date] = revenue;
+    });
   }
 
   Future<void> _selectDateRange() async {
@@ -92,6 +102,255 @@ class _DashboardPageState extends State<DashboardPage> {
         isDateRangeSelected = true;
       });
     }
+  }
+
+  Future<void> _showPrinterList() async {
+    final printerDetails = await PrinterService().getPrinterDetails();
+    
+    if (!mounted) return;
+    
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Daftar Printer Terhubung'),
+        content: SizedBox(
+          width: 500,
+          child: printerDetails.isEmpty
+              ? const Center(
+                  child: Padding(
+                    padding: EdgeInsets.all(20),
+                    child: Text('Tidak ada printer yang terhubung'),
+                  ),
+                )
+              : ListView.builder(
+                  shrinkWrap: true,
+                  itemCount: printerDetails.length,
+                  itemBuilder: (context, index) {
+                    final printer = printerDetails[index];
+                    return Card(
+                      margin: const EdgeInsets.symmetric(vertical: 8),
+                      child: ListTile(
+                        leading: const Icon(Icons.print, color: Color(0xFF3B82F6)),
+                        title: Text(printer['name'] ?? 'Unknown'),
+                        subtitle: Text('Default: ${printer['isDefault']}'),
+                        isThreeLine: false,
+                      ),
+                    );
+                  },
+                ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Tutup'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _showBackupDialog() async {
+    bool isLoading = false;
+    
+    if (!mounted) return;
+    
+    showDialog(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setState) => AlertDialog(
+          title: const Text('Backup Data'),
+          content: SizedBox(
+            width: 450,
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text('Pilih data yang ingin di-backup:'),
+                const SizedBox(height: 20),
+                ElevatedButton.icon(
+                  icon: const Icon(Icons.shopping_cart),
+                  label: const Text('Backup Data Penjualan'),
+                  onPressed: isLoading ? null : () async {
+                    setState(() => isLoading = true);
+                    try {
+                      final path = await BackupService.backupTransactions();
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text('Backup penjualan berhasil: $path')),
+                        );
+                      }
+                    } catch (e) {
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text('Error: $e')),
+                        );
+                      }
+                    } finally {
+                      if (mounted) setState(() => isLoading = false);
+                    }
+                  },
+                ),
+                const SizedBox(height: 12),
+                ElevatedButton.icon(
+                  icon: const Icon(Icons.inventory_2),
+                  label: const Text('Backup Data Inventaris'),
+                  onPressed: isLoading ? null : () async {
+                    setState(() => isLoading = true);
+                    try {
+                      final path = await BackupService.backupInventory();
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text('Backup inventaris berhasil: $path')),
+                        );
+                      }
+                    } catch (e) {
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text('Error: $e')),
+                        );
+                      }
+                    } finally {
+                      if (mounted) setState(() => isLoading = false);
+                    }
+                  },
+                ),
+                const SizedBox(height: 12),
+                ElevatedButton.icon(
+                  icon: const Icon(Icons.backup),
+                  label: const Text('Backup Semua Data'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF10B981),
+                  ),
+                  onPressed: isLoading ? null : () async {
+                    setState(() => isLoading = true);
+                    try {
+                      final paths = await BackupService.backupAll();
+                      if (mounted) {
+                        Navigator.pop(context);
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text('Backup semua data berhasil!\n'
+                                'Penjualan: ${paths['transactions']}\n'
+                                'Inventaris: ${paths['inventory']}'),
+                            duration: const Duration(seconds: 4),
+                          ),
+                        );
+                      }
+                    } catch (e) {
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text('Error: $e')),
+                        );
+                      }
+                    } finally {
+                      if (mounted) setState(() => isLoading = false);
+                    }
+                  },
+                ),
+                const SizedBox(height: 24),
+                const Divider(),
+                const SizedBox(height: 12),
+                const Text('Export ke Excel:'),
+                const SizedBox(height: 12),
+                ElevatedButton.icon(
+                  icon: const Icon(Icons.table_chart),
+                  label: const Text('Export Penjualan ke Excel'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF059669),
+                  ),
+                  onPressed: isLoading ? null : () async {
+                    setState(() => isLoading = true);
+                    try {
+                      final path = await BackupService.exportTransactionsExcel();
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text('Export penjualan Excel berhasil: $path')),
+                        );
+                      }
+                    } catch (e) {
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text('Error: $e')),
+                        );
+                      }
+                    } finally {
+                      if (mounted) setState(() => isLoading = false);
+                    }
+                  },
+                ),
+                const SizedBox(height: 12),
+                ElevatedButton.icon(
+                  icon: const Icon(Icons.table_chart),
+                  label: const Text('Export Inventaris ke Excel'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF059669),
+                  ),
+                  onPressed: isLoading ? null : () async {
+                    setState(() => isLoading = true);
+                    try {
+                      final path = await BackupService.exportInventoryExcel();
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text('Export inventaris Excel berhasil: $path')),
+                        );
+                      }
+                    } catch (e) {
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text('Error: $e')),
+                        );
+                      }
+                    } finally {
+                      if (mounted) setState(() => isLoading = false);
+                    }
+                  },
+                ),
+                const SizedBox(height: 12),
+                ElevatedButton.icon(
+                  icon: const Icon(Icons.table_chart),
+                  label: const Text('Export Semua ke Excel'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF16A34A),
+                  ),
+                  onPressed: isLoading ? null : () async {
+                    setState(() => isLoading = true);
+                    try {
+                      final paths = await BackupService.exportAllExcel();
+                      if (mounted) {
+                        Navigator.pop(context);
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text('Export semua data Excel berhasil!\n'
+                                'Penjualan: ${paths['transactions']}\n'
+                                'Inventaris: ${paths['inventory']}'),
+                            duration: const Duration(seconds: 4),
+                          ),
+                        );
+                      }
+                    } catch (e) {
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text('Error: $e')),
+                        );
+                      }
+                    } finally {
+                      if (mounted) setState(() => isLoading = false);
+                    }
+                  },
+                ),
+              ],
+            ),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Tutup'),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   void _nav(int i) {
@@ -130,7 +389,7 @@ class _DashboardPageState extends State<DashboardPage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              /// TITLE & PRINTER STATUS
+              /// TITLE & PRINTER STATUS & BACKUP
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
@@ -142,34 +401,68 @@ class _DashboardPageState extends State<DashboardPage> {
                       color: Color(0xFF0F172A),
                     ),
                   ),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                    decoration: BoxDecoration(
-                      color: printerReady ? const Color(0xFFDCFCE7) : const Color(0xFFFEE2E2),
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(
-                        color: printerReady ? const Color(0xFF86EFAC) : const Color(0xFFFECACA),
-                      ),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          Icons.print,
-                          size: 18,
-                          color: printerReady ? const Color(0xFF16A34A) : const Color(0xFFDC2626),
-                        ),
-                        const SizedBox(width: 6),
-                        Text(
-                          printerReady ? 'Printer Siap' : 'Printer Tidak Siap',
-                          style: TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w600,
-                            color: printerReady ? const Color(0xFF16A34A) : const Color(0xFFDC2626),
+                  Row(
+                    children: [
+                      GestureDetector(
+                        onTap: _showBackupDialog,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFFEF3C7),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: const Color(0xFFFCD34D)),
+                          ),
+                          child: const Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.backup, size: 18, color: Color(0xFFD97706)),
+                              SizedBox(width: 6),
+                              Text(
+                                'Backup',
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w600,
+                                  color: Color(0xFFD97706),
+                                ),
+                              ),
+                            ],
                           ),
                         ),
-                      ],
-                    ),
+                      ),
+                      const SizedBox(width: 12),
+                      GestureDetector(
+                        onTap: _showPrinterList,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                          decoration: BoxDecoration(
+                            color: printerReady ? const Color(0xFFDCFCE7) : const Color(0xFFFEE2E2),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(
+                              color: printerReady ? const Color(0xFF86EFAC) : const Color(0xFFFECACA),
+                            ),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                Icons.print,
+                                size: 18,
+                                color: printerReady ? const Color(0xFF16A34A) : const Color(0xFFDC2626),
+                              ),
+                              const SizedBox(width: 6),
+                              Text(
+                                printerReady ? 'Printer Siap' : 'Printer Tidak Siap',
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w600,
+                                  color: printerReady ? const Color(0xFF16A34A) : const Color(0xFFDC2626),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),
@@ -222,7 +515,7 @@ class _DashboardPageState extends State<DashboardPage> {
                   color: Colors.white,
                   borderRadius: BorderRadius.circular(16),
                   border: Border.all(color: const Color(0xFFE5E7EB)),
-                  boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 8)],
+                  boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 8)],
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -370,8 +663,8 @@ class _DashboardPageState extends State<DashboardPage> {
                                 show: true,
                                 gradient: LinearGradient(
                                   colors: [
-                                    const Color(0xFF3B82F6).withOpacity(0.3),
-                                    const Color(0xFF3B82F6).withOpacity(0.0),
+                                    const Color(0xFF3B82F6).withValues(alpha: 0.3),
+                                    const Color(0xFF3B82F6).withValues(alpha: 0.0),
                                   ],
                                   begin: Alignment.topCenter,
                                   end: Alignment.bottomCenter,
@@ -396,7 +689,7 @@ class _DashboardPageState extends State<DashboardPage> {
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
                     colors: [
-                      const Color(0xFF3B82F6).withOpacity(0.9),
+                      const Color(0xFF3B82F6).withValues(alpha: 0.9),
                       const Color(0xFF2563EB),
                     ],
                     begin: Alignment.topLeft,
@@ -405,7 +698,7 @@ class _DashboardPageState extends State<DashboardPage> {
                   borderRadius: BorderRadius.circular(16),
                   boxShadow: [
                     BoxShadow(
-                      color: const Color(0xFF3B82F6).withOpacity(0.3),
+                      color: const Color(0xFF3B82F6).withValues(alpha: 0.3),
                       blurRadius: 12,
                       offset: const Offset(0, 4),
                     ),
@@ -416,7 +709,7 @@ class _DashboardPageState extends State<DashboardPage> {
                     Container(
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.2),
+                        color: Colors.white.withValues(alpha: 0.2),
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: const Icon(Icons.flash_on,
@@ -478,7 +771,7 @@ class _DashboardPageState extends State<DashboardPage> {
           color: Colors.white,
           borderRadius: BorderRadius.circular(16),
           border: Border.all(color: const Color(0xFFE5E7EB)),
-          boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 8)],
+          boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 8)],
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -486,7 +779,7 @@ class _DashboardPageState extends State<DashboardPage> {
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: color.withOpacity(0.1),
+                color: color.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Icon(icon, color: color, size: 24),

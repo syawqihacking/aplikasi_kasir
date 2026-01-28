@@ -97,4 +97,30 @@ class PrinterService {
       return false;
     }
   }
+
+  /// Get list of available printers
+  Future<List<String>> getAvailablePrinters() async {
+    try {
+      final printers = await Printing.listPrinters();
+      return printers.map((p) => p.name).toList();
+    } catch (e) {
+      return [];
+    }
+  }
+
+  /// Get printer details including name and status
+  Future<List<Map<String, String>>> getPrinterDetails() async {
+    try {
+      final printers = await Printing.listPrinters();
+      return printers
+          .map((p) => {
+                'name': p.name,
+                'isDefault': p.isDefault ? 'Ya' : 'Tidak',
+                'url': p.url,
+              })
+          .toList();
+    } catch (e) {
+      return [];
+    }
+  }
 }

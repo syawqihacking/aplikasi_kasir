@@ -57,4 +57,29 @@ class ReportService {
       WHERE ti.transaction_id = ?
     ''', [trxId]);
   }
+
+  /// Get daily revenue for a date range
+  static Future<Map<DateTime, int>> dailyRevenueByDateRange(
+    DateTime start,
+    DateTime end,
+  ) async {
+    final result = await DatabaseService.db.rawQuery('''
+      SELECT date(created_at) as date, SUM(total_gross) as total
+      FROM transactions
+      WHERE date(created_at) BETWEEN date(?) AND date(?)
+      GROUP BY date(created_at)
+      ORDER BY date(created_at)
+    ''', [start.toIso8601String(), end.toIso8601String()]);
+
+    final Map<DateTime, int> dailyRevenue = {};
+
+    for (var row in result) {
+      final dateStr = row['date'] as String;
+      final date = DateTime.parse(dateStr);
+      final total = (row['total'] as int?) ?? 0;
+      dailyRevenue[date] = total;
+    }
+
+    return dailyRevenue;
+  }
 }
