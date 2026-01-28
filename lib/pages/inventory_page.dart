@@ -3,9 +3,11 @@ import '../core/widgets/app_layout.dart';
 import '../models/product.dart';
 import '../services/product_service.dart';
 import '../widgets/product_form_dialog.dart';
+import '../widgets/restock_dialog.dart';
 import 'dashboard_page.dart';
 import 'pos_page.dart';
 import 'reports_page.dart';
+import 'settings_page.dart';
 
 class InventoryPage extends StatefulWidget {
   const InventoryPage({super.key});
@@ -54,6 +56,10 @@ class _InventoryPageState extends State<InventoryPage> {
         Navigator.pushReplacement(
             context, MaterialPageRoute(builder: (_) => const ReportsPage()));
         break;
+      case 4:
+        Navigator.pushReplacement(
+            context, MaterialPageRoute(builder: (_) => const SettingsPage()));
+        break;
     }
   }
 
@@ -81,6 +87,25 @@ class _InventoryPageState extends State<InventoryPage> {
                         style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700, color: Color(0xFF0F172A)),
                       ),
                       const Spacer(),
+                      ElevatedButton.icon(
+                        icon: const Icon(Icons.add_circle_outline),
+                        label: const Text('Tambah Stok'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF16A34A),
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                        ),
+                        onPressed: () async {
+                          final result = await showDialog<Product>(
+                            context: context,
+                            builder: (context) => RestockDialog(products: products),
+                          );
+                          if (result != null) {
+                            _load();
+                          }
+                        },
+                      ),
+                      const SizedBox(width: 12),
                       ElevatedButton.icon(
                         icon: const Icon(Icons.add),
                         label: const Text('Tambah Produk'),

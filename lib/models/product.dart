@@ -48,4 +48,29 @@ class Product {
         minStock: map['min_stock'],
         warrantyDays: map['warranty_days'],
       );
+
+  Product copyWith({
+    int? id,
+    String? sku,
+    String? name,
+    String? category,
+    String? brand,
+    int? buyPrice,
+    int? sellPrice,
+    int? stock,
+    int? minStock,
+    int? warrantyDays,
+  }) =>
+      Product(
+        id: id ?? this.id,
+        sku: sku ?? this.sku,
+        name: name ?? this.name,
+        category: category ?? this.category,
+        brand: brand ?? this.brand,
+        buyPrice: buyPrice ?? this.buyPrice,
+        sellPrice: sellPrice ?? this.sellPrice,
+        stock: stock ?? this.stock,
+        minStock: minStock ?? this.minStock,
+        warrantyDays: warrantyDays ?? this.warrantyDays,
+      );
 }

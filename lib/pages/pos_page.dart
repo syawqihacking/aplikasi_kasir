@@ -9,6 +9,7 @@ import 'dashboard_page.dart';
 import 'inventory_page.dart';
 import 'reports_page.dart';
 import 'print_page.dart';
+import 'settings_page.dart';
 
 class PosPage extends StatefulWidget {
   const PosPage({super.key});
@@ -47,6 +48,10 @@ class _PosPageState extends State<PosPage> {
       case 3:
         Navigator.pushReplacement(
             context, MaterialPageRoute(builder: (_) => const ReportsPage()));
+        break;
+      case 4:
+        Navigator.pushReplacement(
+            context, MaterialPageRoute(builder: (_) => const SettingsPage()));
         break;
     }
   }
@@ -167,8 +172,16 @@ class _PosPageState extends State<PosPage> {
                                     )),
                               ],
                             ),
-                            onTap: () =>
-                                setState(() => cart[p] = (cart[p] ?? 0) + 1),
+                            onTap: () {
+                              final currentQty = cart[p] ?? 0;
+                              if (currentQty < p.stock) {
+                                setState(() => cart[p] = currentQty + 1);
+                              } else {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(content: Text('Stok ${p.name} hanya ${p.stock}'), backgroundColor: Colors.red),
+                                );
+                              }
+                            },
                           ),
                         );
                       },
@@ -375,6 +388,24 @@ class _PosPageState extends State<PosPage> {
                                 ScaffoldMessenger.of(context).showSnackBar(
                                   const SnackBar(content: Text('Keranjang masih kosong')),
                                 );
+                                return;
+                              }
+                              
+                              // Validasi stok sebelum checkout
+                              String? stockError;
+                              for (final entry in cart.entries) {
+                                if (entry.value > entry.key.stock) {
+                                  stockError = 'Stok ${entry.key.name} tidak cukup (tersedia: ${entry.key.stock}, diminta: ${entry.value})';
+                                  break;
+                                }
+                              }
+                              
+                              if (stockError != null) {
+                                if (mounted) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(content: Text(stockError), backgroundColor: Colors.red),
+                                  );
+                                }
                                 return;
                               }
                               

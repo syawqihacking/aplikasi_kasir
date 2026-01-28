@@ -46,6 +46,8 @@ class AppLayout extends StatelessWidget {
                 _nav(Icons.inventory_2, 'Inventori', 1),
                 _nav(Icons.point_of_sale, 'Kasir', 2),
                 _nav(Icons.receipt_long, 'Laporan', 3),
+                const Spacer(),
+                _nav(Icons.settings, 'Pengaturan', 4),
               ],
             ),
           ),

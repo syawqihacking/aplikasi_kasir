@@ -2,12 +2,15 @@ import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'dart:async';
 import '../core/widgets/app_layout.dart';
+import '../models/product.dart';
 import '../services/report_service.dart';
 import '../services/printer_service.dart';
 import '../services/backup_service.dart';
+import '../services/product_service.dart';
 import 'inventory_page.dart';
 import 'pos_page.dart';
 import 'reports_page.dart';
+import 'settings_page.dart';
 
 class DashboardPage extends StatefulWidget {
   const DashboardPage({super.key});
@@ -27,11 +30,17 @@ class _DashboardPageState extends State<DashboardPage> {
   bool isDateRangeSelected = false;
   bool printerReady = false;
   Timer? _printerCheckTimer;
+  List<Product> lowStockProducts = [];
+  bool _alertShown = false;
 
   @override
   void initState() {
     super.initState();
-    _load();
+    _load().then((_) {
+      if (mounted && lowStockProducts.isNotEmpty && !_alertShown) {
+        _showLowStockAlert();
+      }
+    });
     _startPrinterCheck();
   }
 
@@ -51,8 +60,205 @@ class _DashboardPageState extends State<DashboardPage> {
     grossToday = await ReportService.totalGrossToday();
     netToday = await ReportService.totalNetToday();
     await _loadChartData();
+    await _loadLowStockProducts();
     printerReady = await PrinterService().isPrinterAvailable();
     setState(() {});
+  }
+
+  Future<void> _loadLowStockProducts() async {
+    final allProducts = await ProductService.getAll();
+    lowStockProducts = allProducts
+        .where((p) => p.stock <= p.minStock)
+        .toList();
+  }
+
+  void _showLowStockAlert() {
+    _alertShown = true;
+    
+    final outOfStockProducts = lowStockProducts.where((p) => p.stock == 0).toList();
+    final lowStockOnly = lowStockProducts.where((p) => p.stock > 0).toList();
+    
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        title: Row(
+          children: [
+            const Icon(Icons.warning_rounded, color: Color(0xFFF59E0B), size: 28),
+            const SizedBox(width: 12),
+            const Expanded(
+              child: Text(
+                '⚠️ Notifikasi Stok',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w700,
+                  color: Color(0xFFF59E0B),
+                ),
+              ),
+            ),
+          ],
+        ),
+        content: SizedBox(
+          width: 500,
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Ada ${lowStockProducts.length} produk dengan stok rendah atau habis',
+                  style: const TextStyle(
+                    fontSize: 13,
+                    color: Color(0xFF64748B),
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                
+                // STOK HABIS
+                if (outOfStockProducts.isNotEmpty) ...[
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFEE2E2),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: const Color(0xFFFECACA)),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            const Icon(Icons.error_rounded, color: Color(0xFFDC2626), size: 18),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                'STOK HABIS (${outOfStockProducts.length})',
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 12,
+                                  color: Color(0xFFDC2626),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        ...outOfStockProducts.map((p) => Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 4),
+                          child: Row(
+                            children: [
+                              const Icon(Icons.circle_rounded, size: 6, color: Color(0xFFDC2626)),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  p.name,
+                                  style: const TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
+                                    color: Color(0xFFDC2626),
+                                  ),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                            ],
+                          ),
+                        )),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                ],
+                
+                // STOK RENDAH
+                if (lowStockOnly.isNotEmpty) ...[
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFEF3C7),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: const Color(0xFFFCD34D)),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            const Icon(Icons.info_rounded, color: Color(0xFFF59E0B), size: 18),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                'STOK RENDAH (${lowStockOnly.length})',
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 12,
+                                  color: Color(0xFFF59E0B),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        ...lowStockOnly.map((p) => Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 4),
+                          child: Row(
+                            children: [
+                              const Icon(Icons.circle_rounded, size: 6, color: Color(0xFFF59E0B)),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      p.name,
+                                      style: const TextStyle(
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w600,
+                                        color: Color(0xFFF59E0B),
+                                      ),
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                    Text(
+                                      'Stok: ${p.stock} / Min: ${p.minStock}',
+                                      style: const TextStyle(
+                                        fontSize: 11,
+                                        color: Color(0xFFB45309),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        )),
+                      ],
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Nanti'),
+          ),
+          ElevatedButton.icon(
+            icon: const Icon(Icons.inventory_2),
+            label: const Text('Lihat Inventaris'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFF59E0B),
+              foregroundColor: Colors.white,
+            ),
+            onPressed: () {
+              Navigator.pop(context);
+              _nav(1); // Navigate to inventory
+            },
+          ),
+        ],
+      ),
+    );
   }
 
   Future<void> _loadChartData() async {
@@ -367,6 +573,10 @@ class _DashboardPageState extends State<DashboardPage> {
         Navigator.pushReplacement(
             context, MaterialPageRoute(builder: (_) => const ReportsPage()));
         break;
+      case 4:
+        Navigator.pushReplacement(
+            context, MaterialPageRoute(builder: (_) => const SettingsPage()));
+        break;
     }
   }
 
@@ -505,6 +715,159 @@ class _DashboardPageState extends State<DashboardPage> {
                   ),
                 ],
               ),
+
+              const SizedBox(height: 32),
+
+              /// NOTIFIKASI STOK RENDAH
+              if (lowStockProducts.isNotEmpty)
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFEF3C7),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: const Color(0xFFFCD34D), width: 2),
+                    boxShadow: [
+                      BoxShadow(
+                        color: const Color(0xFFF59E0B).withOpacity(0.1),
+                        blurRadius: 8,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          const Icon(Icons.warning_rounded, color: Color(0xFFF59E0B), size: 24),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text(
+                                  '⚠️ Notifikasi Stok Rendah',
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w700,
+                                    color: Color(0xFFD97706),
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  '${lowStockProducts.length} produk stok sudah mencapai level minimum',
+                                  style: const TextStyle(
+                                    fontSize: 12,
+                                    color: Color(0xFFB45309),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      SizedBox(
+                        height: 160,
+                        child: ListView.separated(
+                          scrollDirection: Axis.horizontal,
+                          separatorBuilder: (_, __) => const SizedBox(width: 8),
+                          itemCount: lowStockProducts.length,
+                          itemBuilder: (_, i) {
+                            final product = lowStockProducts[i];
+                            final stockPercentage = (product.stock / (product.minStock + 1)) * 100;
+                            final isOutOfStock = product.stock == 0;
+                            
+                            return Container(
+                              width: 160,
+                              padding: const EdgeInsets.all(12),
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(10),
+                                border: Border.all(
+                                  color: isOutOfStock ? const Color(0xFFF87171) : const Color(0xFFFECACA),
+                                ),
+                              ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text(
+                                    product.name,
+                                    maxLines: 2,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w600,
+                                      color: Color(0xFF0F172A),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  ClipRRect(
+                                    borderRadius: BorderRadius.circular(4),
+                                    child: LinearProgressIndicator(
+                                      value: stockPercentage / 100,
+                                      minHeight: 6,
+                                      backgroundColor: const Color(0xFFE5E7EB),
+                                      valueColor: AlwaysStoppedAnimation<Color>(
+                                        isOutOfStock
+                                            ? const Color(0xFFDC2626)
+                                            : const Color(0xFFF59E0B),
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Row(
+                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      Text(
+                                        'Stok: ${product.stock}',
+                                        style: TextStyle(
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.w600,
+                                          color: isOutOfStock
+                                              ? const Color(0xFFDC2626)
+                                              : const Color(0xFF7C3AED),
+                                        ),
+                                      ),
+                                      Text(
+                                        'Min: ${product.minStock}',
+                                        style: const TextStyle(
+                                          fontSize: 10,
+                                          color: Color(0xFF94A3B8),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  if (isOutOfStock) ...[
+                                    const SizedBox(height: 6),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xFFDC2626),
+                                        borderRadius: BorderRadius.circular(3),
+                                      ),
+                                      child: const Text(
+                                        'STOK HABIS',
+                                        style: TextStyle(
+                                          fontSize: 9,
+                                          fontWeight: FontWeight.w700,
+                                          color: Colors.white,
+                                        ),
+                                      ),
+                                    ),
+                                  ]
+                                ],
+                              ),
+                            );
+                          },
+                        ),
+                      ),
+                    ],
+                  ),
+                )
+              else
+                const SizedBox.shrink(),
 
               const SizedBox(height: 32),
 

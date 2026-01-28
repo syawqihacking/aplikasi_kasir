@@ -4,6 +4,7 @@ import '../services/report_service.dart';
 import 'dashboard_page.dart';
 import 'inventory_page.dart';
 import 'pos_page.dart';
+import 'settings_page.dart';
 
 class ReportsPage extends StatefulWidget {
   const ReportsPage({super.key});
@@ -29,6 +30,10 @@ class _ReportsPageState extends State<ReportsPage> {
       case 2:
         Navigator.pushReplacement(
             context, MaterialPageRoute(builder: (_) => const PosPage()));
+        break;
+      case 4:
+        Navigator.pushReplacement(
+            context, MaterialPageRoute(builder: (_) => const SettingsPage()));
         break;
     }
   }
