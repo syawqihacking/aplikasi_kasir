@@ -5,6 +5,7 @@ class TransactionItem {
   final int qty;
   final int sellPrice;
   final int buyPrice;
+  final double discountPercent;
 
   TransactionItem({
     this.id,
@@ -13,9 +14,12 @@ class TransactionItem {
     required this.qty,
     required this.sellPrice,
     required this.buyPrice,
+    this.discountPercent = 0.0,
   });
 
-  int get profit => (sellPrice - buyPrice) * qty;
+  int get discountAmount => (sellPrice * discountPercent / 100).toInt();
+  int get finalPrice => sellPrice - discountAmount;
+  int get profit => (finalPrice - buyPrice) * qty;
 
   Map<String, dynamic> toMap() => {
         'id': id,
@@ -24,5 +28,6 @@ class TransactionItem {
         'qty': qty,
         'sell_price': sellPrice,
         'buy_price': buyPrice,
+        'discount_percent': discountPercent,
       };
 }

@@ -95,7 +95,7 @@ class ExpenseService {
     final result = await DatabaseService.db.rawQuery(
       'SELECT category, SUM(amount) as total FROM expenses GROUP BY category',
     );
-    final map = <String, int>{};
+    final map = <String, int>{}; 
     for (final row in result) {
       map[row['category'] as String] = row['total'] as int;
     }

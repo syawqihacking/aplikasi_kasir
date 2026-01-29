@@ -14,7 +14,7 @@ class DatabaseService {
 
     _db = await openDatabase(
       path,
-      version: 3,
+      version: 4,
       onCreate: (db, _) async {
         await db.execute('''
           CREATE TABLE users (
@@ -79,7 +79,8 @@ class DatabaseService {
             product_id INTEGER,
             qty INTEGER,
             sell_price INTEGER,
-            buy_price INTEGER
+            buy_price INTEGER,
+            discount_percent REAL DEFAULT 0.0
           )
         ''');
 
@@ -182,6 +183,15 @@ class DatabaseService {
                 date TEXT,
                 created_by_user_id INTEGER
               )
+            ''');
+          } catch (_) {}
+        }
+
+        // Migration for version 4 - Add discount to transaction_items
+        if (oldVersion < 4) {
+          try {
+            await db.execute('''
+              ALTER TABLE transaction_items ADD COLUMN discount_percent REAL DEFAULT 0.0
             ''');
           } catch (_) {}
         }
